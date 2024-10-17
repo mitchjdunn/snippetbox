@@ -3,8 +3,9 @@ package main
 import (
 	"html/template"
 	"path/filepath"
-	"snippetbox.mitchymit.ch/internal/models"
 	"time"
+
+	"snippetbox.mitchymit.ch/internal/models"
 )
 
 // Define a templateData type to act as the holding structure for
@@ -32,7 +33,7 @@ var functions = template.FuncMap{
 	"humanDate": humanDate,
 }
 
-func newTemplateCache() (map[string]*template.Template, error) {
+func newTemplateCache(staticDir string) (map[string]*template.Template, error) {
 	// Initialize a new map to act as the cache.
 	cache := map[string]*template.Template{}
 
@@ -40,7 +41,7 @@ func newTemplateCache() (map[string]*template.Template, error) {
 	// match the pattern "./ui/html/pages/*.tmpl". This will essentially gives
 	// us a slice of all the filepaths for our application 'page' templates
 	// like: [ui/html/pages/home.tmpl ui/html/pages/view.tmpl]
-	pages, err := filepath.Glob("./ui/html/pages/*.tmpl")
+	pages, err := filepath.Glob(staticDir + "/html/pages/*.tmpl")
 	if err != nil {
 		return nil, err
 	}
@@ -50,13 +51,13 @@ func newTemplateCache() (map[string]*template.Template, error) {
 		name := filepath.Base(page)
 
 		// Parse the base template file into a template set.
-		ts, err := template.New(name).Funcs(functions).ParseFiles("./ui/html/base.tmpl")
+		ts, err := template.New(name).Funcs(functions).ParseFiles(staticDir + "/html/base.tmpl")
 		if err != nil {
 			return nil, err
 		}
 
 		// Call ParseGlob() *on this template set* to add any partials.
-		ts, err = ts.ParseGlob("./ui/html/partials/*.tmpl")
+		ts, err = ts.ParseGlob(staticDir + "/html/partials/*.tmpl")
 		if err != nil {
 			return nil, err
 		}

@@ -3,16 +3,17 @@ package main
 import (
 	"database/sql"
 	"flag"
-	"github.com/alexedwards/scs/mysqlstore"
-	"github.com/alexedwards/scs/v2"
-	"github.com/go-playground/form/v4"
-	_ "github.com/go-sql-driver/mysql" // New import
 	"html/template"
 	"log/slog"
 	"net/http"
 	"os"
-	"snippetbox.mitchymit.ch/internal/models"
 	"time"
+
+	"github.com/alexedwards/scs/mysqlstore"
+	"github.com/alexedwards/scs/v2"
+	"github.com/go-playground/form/v4"
+	_ "github.com/go-sql-driver/mysql" // New import
+	"snippetbox.mitchymit.ch/internal/models"
 )
 
 // Define an application struct to hold the applicaiton-wide dependencies for the
@@ -24,6 +25,7 @@ type application struct {
 	templateCache  map[string]*template.Template
 	formDecoder    *form.Decoder
 	sessionManager *scs.SessionManager
+	staticDir      string // TODO create config that is passed around?
 }
 
 func main() {
@@ -31,6 +33,9 @@ func main() {
 	// and some short hel p text explaining what the flag controls. The value of the flag
 	// will be stored in the addr variable at runtime
 	addr := flag.String("addr", ":4000", "Http network address")
+	tlsCertPath := flag.String("tls-cert-path", "./tls/localhost.pem", "path to tls certificate")
+	tlskeyPath := flag.String("tls-key-path", "./tls/localhost-key.pem", "path to tls key")
+	uiDir := flag.String("ui-dir", "./ui", "path to static resources")
 	// Define a new command-line flag for the MySQL DSN string.
 	dsn := flag.String("dsn", "web:pass@/snippetbox?parseTime=true", "MySQL data source name")
 
@@ -52,7 +57,7 @@ func main() {
 	}))
 
 	// Initialize a new template cache...
-	templateCache, err := newTemplateCache()
+	templateCache, err := newTemplateCache(*uiDir)
 	if err != nil {
 		logger.Error(err.Error())
 		os.Exit(1)
@@ -97,6 +102,7 @@ func main() {
 		templateCache:  templateCache,
 		formDecoder:    formDecoder,
 		sessionManager: sessionManager,
+		staticDir:      *uiDir,
 	}
 	// Initialize a tls.Config struct to hold the non-default TLS settings we
 	// want the server to use. In this case the only thing that we're changing
@@ -133,7 +139,7 @@ func main() {
 	// pass in the paths to the TLS certificate and corresponding private key as
 	// the two parameters.
 	// https://www.youtube.com/watch?v=FARQMJndUn0
-	err = srv.ListenAndServeTLS("./tls/cert.pem", "./tls/key.pem")
+	err = srv.ListenAndServeTLS(*tlsCertPath, *tlskeyPath)
 	// cd tls
 	// go run /usr/local/go/src/crypto/tls/generate_cert.go --rsa-bits=2048 --host=localhost
 	logger.Error(err.Error())
