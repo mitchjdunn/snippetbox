@@ -13,6 +13,11 @@ func (app *application) routes() http.Handler {
 	// Note that the path given to the Dir function is relative
 	fileServer := http.FileServer(http.Dir("./ui/static"))
 
+	// Create a new middleware chain containing the middleware specific to our
+	// dynamic application routes. For now, this chain will only contain the
+	// LoadAndSave session middleware but we'll add more to it later.
+	dynamic := alice.New(app.sessionManager.LoadAndSave)
+
 	// Use the mux.handle function to register the file server as the handler
 	// for all urls that start with static and strip the prefix
 	mux.Handle("GET /static/", http.StripPrefix("/static", fileServer))
@@ -20,9 +25,9 @@ func (app *application) routes() http.Handler {
 	// Swap the route declarations to use the application struct's methods as the
 	// handler functions.
 	mux.HandleFunc("GET /{$}", app.home)
-	mux.HandleFunc("GET /snippet/view/{id}", app.snippetView)
-	mux.HandleFunc("GET /snippet/create", app.snippetCreate)
-	mux.HandleFunc("POST /snippet/create", app.snippetCreatePost)
+	mux.Handle("GET /snippet/view/{id}", dynamic.ThenFunc(app.snippetView))
+	mux.Handle("GET /snippet/create", dynamic.ThenFunc(app.snippetCreate))
+	mux.Handle("POST /snippet/create", dynamic.ThenFunc(app.snippetCreatePost))
 
 	// Create a middleware chain containing our 'standard' middleware
 	// which will be used for every request our application receives.

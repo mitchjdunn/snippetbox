@@ -3,6 +3,8 @@ package main
 import (
 	"database/sql"
 	"flag"
+	"github.com/alexedwards/scs/mysqlstore"
+	"github.com/alexedwards/scs/v2"
 	"github.com/go-playground/form/v4"
 	_ "github.com/go-sql-driver/mysql" // New import
 	"html/template"
@@ -10,16 +12,18 @@ import (
 	"net/http"
 	"os"
 	"snippetbox.mitchymit.ch/internal/models"
+	"time"
 )
 
 // Define an application struct to hold the applicaiton-wide dependencies for the
 // web application. For now we'll only include the structured logger, but we'll
 // add more to this as the build progresses.
 type application struct {
-	logger        *slog.Logger
-	snippets      *models.SnippetModel
-	templateCache map[string]*template.Template
-	formDecoder   *form.Decoder
+	logger         *slog.Logger
+	snippets       *models.SnippetModel
+	templateCache  map[string]*template.Template
+	formDecoder    *form.Decoder
+	sessionManager *scs.SessionManager
 }
 
 func main() {
@@ -30,6 +34,12 @@ func main() {
 	// Define a new command-line flag for the MySQL DSN string.
 	dsn := flag.String("dsn", "web:pass@/snippetbox?parseTime=true", "MySQL data source name")
 
+	// Importantly, we use the flag.Parse() function to parse the command line flag.
+	// this reads in the command line flag value and assigns it to the addr
+	// variable. you need to call this *before* you use the addr variable
+	// otherwise it will always contain the default value.  If any errors are
+	// encountered during parsing the application will be terminated
+	flag.Parse()
 	// environment vairables are possible, not recommended due to lack of
 	// built in defaults and abilitity to get different types.
 	//addr := os.Getenv("SNIPPETBOX_ADDR")
@@ -66,31 +76,66 @@ func main() {
 	// Initialize a decoder instance...
 	formDecoder := form.NewDecoder()
 
+	// Use the scs.New() function to initialize a new session manager. Then we
+	// configure it to use our MySQL database as the session store, and set a
+	// lifetime of 12 hours (so that sessions automatically expire 12 hours
+	// after first being created).
+	sessionManager := scs.New()
+	sessionManager.Store = mysqlstore.New(db)
+	sessionManager.Lifetime = 12 * time.Hour
+	// Make sure that the Secure attribute is set on our session cookies.
+	// Setting this means that the cookie will only be sent by a user's web
+	// browser when a HTTPS connection is being used (and won't be sent over an
+	// unsecure HTTP connection).
+	sessionManager.Cookie.Secure = true
+
 	// Initialize a new instance of our application struct, containing the
 	// dependencies (for now, just the structured logger).
 	app := &application{
-		logger:        logger,
-		snippets:      &models.SnippetModel{DB: db},
-		templateCache: templateCache,
-		formDecoder:   formDecoder,
+		logger:         logger,
+		snippets:       &models.SnippetModel{DB: db},
+		templateCache:  templateCache,
+		formDecoder:    formDecoder,
+		sessionManager: sessionManager,
 	}
-
-	// Importantly, we use the flag.Parse() function to parse the command line flag.
-	// this reads in the command line flag value and assigns it to the addr
-	// variable. you need to call this *before* you use the addr variable
-	// otherwise it will always contain the default value.  If any errors are
-	// encountered during parsing the application will be terminated
-	flag.Parse()
-
+	// Initialize a tls.Config struct to hold the non-default TLS settings we
+	// want the server to use. In this case the only thing that we're changing
+	// is the curve preferences value, so that only elliptic curves with
+	// assembly implementations are used.
+	//tlsConfig := &tls.Config
+	//	CurvePreferences: []tls.CurveID{tls.X25519, tls.CurveP256},
+	//}
 	// The value returned from flag.String() function is a pointer to the flag
 	// value, not the value itself. so in this code, that means the addr variable
 	// is actually a pointer, and we need to dereference it (i.e. prefix it with the
 	// * symbol) before using it. Note that we're using the log.Printf()
 	// function to interpolate the address with the log message
-	logger.Info("starting server", "addr", *addr)
+	// Initialize a new http.Server struct. We set the Addr and Handler fields so
+	// that the server uses the same network address and routes as before.
+	srv := &http.Server{
+		Addr:    *addr,
+		Handler: app.routes(),
+		// Create a *log.Logger from our structured logger handler, which writes
+		// log entries at Error level, and assign it to the ErrorLog field. If
+		// you would prefer to log the server errors at Warn level instead, you
+		// could pass slog.LevelWarn as the final parameter.
+		ErrorLog: slog.NewLogLogger(logger.Handler(), slog.LevelError),
+		//TLSConfig: tlsConfig,
+		// Add Idle, Read and Write timeouts to the server.
+		IdleTimeout:  time.Minute,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+	}
 
-	// Pass in the dereferenced addr pointer to http.listenAndServer()
-	err = http.ListenAndServe(*addr, app.routes())
+	logger.Info("starting server", "addr", srv.Addr)
+
+	// Use the ListenAndServeTLS() method to start the HTTPS server. We
+	// pass in the paths to the TLS certificate and corresponding private key as
+	// the two parameters.
+	// https://www.youtube.com/watch?v=FARQMJndUn0
+	err = srv.ListenAndServeTLS("./tls/cert.pem", "./tls/key.pem")
+	// cd tls
+	// go run /usr/local/go/src/crypto/tls/generate_cert.go --rsa-bits=2048 --host=localhost
 	logger.Error(err.Error())
 	os.Exit(1)
 }
