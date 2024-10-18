@@ -1,18 +1,14 @@
 package main
 
 import (
-	"net/http"
-
 	"github.com/justinas/alice"
+	"net/http"
+	"snippetbox.mitchymit.ch/ui"
 )
 
 // The routes() method returns a servemux containing our application routes.
 func (app *application) routes() http.Handler {
 	mux := http.NewServeMux()
-
-	// Create a file server which serves files out of the static dir
-	// Note that the path given to the Dir function is relative
-	fileServer := http.FileServer(http.Dir(app.staticDir + "/static"))
 
 	// Create a new middleware chain containing the middleware specific to our
 	// dynamic application routes. For now, this chain will only contain the
@@ -21,7 +17,9 @@ func (app *application) routes() http.Handler {
 
 	// Use the mux.handle function to register the file server as the handler
 	// for all urls that start with static and strip the prefix
-	mux.Handle("GET /static/", http.StripPrefix("/static", fileServer))
+	mux.Handle("GET /static/", http.FileServerFS(ui.Files))
+	// Add a new GET /ping route.
+	mux.HandleFunc("GET /ping", ping)
 
 	// Swap the route declarations to use the application struct's methods as the
 	// handler functions.

@@ -22,12 +22,11 @@ import (
 // add more to this as the build progresses.
 type application struct {
 	logger         *slog.Logger
-	snippets       *models.SnippetModel
-	users          *models.UserModel
+	snippets       models.SnippetModelInterface // Use our new interface type.
+	users          models.UserModelInterface    // Use our new interface type.
 	templateCache  map[string]*template.Template
 	formDecoder    *form.Decoder
 	sessionManager *scs.SessionManager
-	staticDir      string // TODO create config that is passed around?
 }
 
 func main() {
@@ -35,9 +34,8 @@ func main() {
 	// and some short hel p text explaining what the flag controls. The value of the flag
 	// will be stored in the addr variable at runtime
 	addr := flag.String("addr", ":4000", "Http network address")
-	tlsCertPath := flag.String("tls-cert-path", "./tls/localhost.pem", "path to tls certificate")
-	tlskeyPath := flag.String("tls-key-path", "./tls/localhost-key.pem", "path to tls key")
-	uiDir := flag.String("ui-dir", "./ui", "path to static resources")
+	tlsCertPath := flag.String("tls-cert-path", "./tls/cert.pem", "path to tls certificate")
+	tlskeyPath := flag.String("tls-key-path", "./tls/key.pem", "path to tls key")
 	// Define a new command-line flag for the MySQL DSN string.
 	dsn := flag.String("dsn", "web:pass@/snippetbox?parseTime=true", "MySQL data source name")
 
@@ -59,7 +57,7 @@ func main() {
 	}))
 
 	// Initialize a new template cache...
-	templateCache, err := newTemplateCache(*uiDir)
+	templateCache, err := newTemplateCache()
 	if err != nil {
 		logger.Error(err.Error())
 		os.Exit(1)
@@ -105,7 +103,6 @@ func main() {
 		templateCache:  templateCache,
 		formDecoder:    formDecoder,
 		sessionManager: sessionManager,
-		staticDir:      *uiDir,
 	}
 	// Initialize a tls.Config struct to hold the non-default TLS settings we
 	// want the server to use. In this case the only thing that we're changing

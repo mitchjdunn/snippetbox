@@ -12,7 +12,7 @@ func commonHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP
 		w.Header().Set("Content-Security-Policy",
-			"default-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src fonts.gstatic.com")
+			"default-src 'self'; style-src 'self' fonts.googleapis.com; font-src fonts.gstatic.com")
 		// https://developer.mozilla.org/en-US/docs/Web/Security/Same-origin_policy
 		w.Header().Set("Referrer-Policy", "origin-when-cross-origin")
 		// https://security.stackexchange.com/questions/7506/using-file-extension-and-mime-type-as-output-by-file-i-b-combination-to-dete/7531#7531

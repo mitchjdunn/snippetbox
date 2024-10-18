@@ -36,6 +36,10 @@ type userSignupForm struct {
 	validator.Validator `form:"-"`
 }
 
+func ping(w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte("OK"))
+}
+
 // Change signature of the home handler so it is defined as a method
 // agaisnt *application
 func (app *application) home(w http.ResponseWriter, r *http.Request) {
