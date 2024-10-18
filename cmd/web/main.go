@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"database/sql"
 	"flag"
 	"html/template"
@@ -22,6 +23,7 @@ import (
 type application struct {
 	logger         *slog.Logger
 	snippets       *models.SnippetModel
+	users          *models.UserModel
 	templateCache  map[string]*template.Template
 	formDecoder    *form.Decoder
 	sessionManager *scs.SessionManager
@@ -99,6 +101,7 @@ func main() {
 	app := &application{
 		logger:         logger,
 		snippets:       &models.SnippetModel{DB: db},
+		users:          &models.UserModel{DB: db},
 		templateCache:  templateCache,
 		formDecoder:    formDecoder,
 		sessionManager: sessionManager,
@@ -108,9 +111,9 @@ func main() {
 	// want the server to use. In this case the only thing that we're changing
 	// is the curve preferences value, so that only elliptic curves with
 	// assembly implementations are used.
-	//tlsConfig := &tls.Config
-	//	CurvePreferences: []tls.CurveID{tls.X25519, tls.CurveP256},
-	//}
+	tlsConfig := &tls.Config{
+		CurvePreferences: []tls.CurveID{tls.X25519, tls.CurveP256},
+	}
 	// The value returned from flag.String() function is a pointer to the flag
 	// value, not the value itself. so in this code, that means the addr variable
 	// is actually a pointer, and we need to dereference it (i.e. prefix it with the
@@ -125,8 +128,8 @@ func main() {
 		// log entries at Error level, and assign it to the ErrorLog field. If
 		// you would prefer to log the server errors at Warn level instead, you
 		// could pass slog.LevelWarn as the final parameter.
-		ErrorLog: slog.NewLogLogger(logger.Handler(), slog.LevelError),
-		//TLSConfig: tlsConfig,
+		ErrorLog:  slog.NewLogLogger(logger.Handler(), slog.LevelError),
+		TLSConfig: tlsConfig,
 		// Add Idle, Read and Write timeouts to the server.
 		IdleTimeout:  time.Minute,
 		ReadTimeout:  5 * time.Second,

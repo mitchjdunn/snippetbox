@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/go-playground/form/v4"
 	"net/http"
 	"runtime/debug"
 	"time"
+
+	"github.com/go-playground/form/v4"
+	"github.com/justinas/nosurf"
 )
 
 // The serverError helper writes a log entry at Error level *including the request
@@ -72,8 +74,15 @@ func (app *application) newTemplateData(r *http.Request) templateData {
 		CurrentYear: time.Now().Year(),
 
 		// Add the flash message to the template data, if one exists.
-		Flash: app.sessionManager.PopString(r.Context(), "flash"),
+		Flash:           app.sessionManager.PopString(r.Context(), "flash"),
+		IsAuthenticated: app.isAuthenticated(r),
+		CSRFToken:       nosurf.Token(r),
 	}
+}
+
+// Returns true if user is authenticated, returns false otherwise
+func (app *application) isAuthenticated(r *http.Request) bool {
+	return app.sessionManager.Exists(r.Context(), "authenticatedUserID")
 }
 
 // Create a new decodePostForm() helper method. The second parameter here, dst,
