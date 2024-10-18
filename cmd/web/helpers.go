@@ -82,7 +82,11 @@ func (app *application) newTemplateData(r *http.Request) templateData {
 
 // Returns true if user is authenticated, returns false otherwise
 func (app *application) isAuthenticated(r *http.Request) bool {
-	return app.sessionManager.Exists(r.Context(), "authenticatedUserID")
+	isAuthenticated, ok := r.Context().Value(isAuthenticatedContextKey).(bool)
+	if !ok {
+		return false
+	}
+	return isAuthenticated
 }
 
 // Create a new decodePostForm() helper method. The second parameter here, dst,
